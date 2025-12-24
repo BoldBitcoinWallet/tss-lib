@@ -63,7 +63,17 @@ func (round *round5) Start() *tss.Error {
 	modN := common.ModInt(N)
 	rx := R.X()
 	ry := R.Y()
-	si := modN.Add(modN.Mul(round.temp.m, round.temp.k), modN.Mul(rx, round.temp.sigma))
+
+	// In one-round mode, m is nil, so we can't compute si yet
+	// We'll compute it later in FinalizeGetOurSigShare
+	var si *big.Int
+	if round.temp.m != nil {
+		si = modN.Add(modN.Mul(round.temp.m, round.temp.k), modN.Mul(rx, round.temp.sigma))
+	} else {
+		// For one-round mode, use a placeholder (will be computed later)
+		// We still need to compute bigVi for the commitment, so use r*sigma as placeholder
+		si = modN.Mul(rx, round.temp.sigma)
+	}
 
 	// clear temp.w and temp.k from memory, lint ignore
 	round.temp.w = zero
@@ -93,6 +103,17 @@ func (round *round5) Start() *tss.Error {
 	round.temp.rx = rx
 	round.temp.ry = ry
 	round.temp.bigR = R
+
+	// Store data for one-round signing (if msg is nil, we're in one-round mode)
+	if round.temp.m == nil {
+		round.temp.oneRoundBigR = R
+		// Compute r_sigma_i = r * sigma (used in FinalizeGetOurSigShare)
+		round.temp.oneRoundRSigmaI = modN.Mul(rx, round.temp.sigma).Bytes()
+		// Compute our own BigRBarI = R * k_i for one-round mode
+		kI := new(big.Int).SetBytes(round.temp.oneRoundKI)
+		bigRBarI := R.ScalarMult(kI)
+		round.temp.oneRoundBigRBarJ[round.PartyID().Id] = bigRBarI
+	}
 
 	return nil
 }

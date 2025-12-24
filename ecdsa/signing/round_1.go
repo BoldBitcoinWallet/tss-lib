@@ -37,7 +37,8 @@ func (round *round1) Start() *tss.Error {
 	// but considered different blockchain use different hash function we accept the converted big.Int
 	// if this big.Int is not belongs to Zq, the client might not comply with common rule (for ECDSA):
 	// https://github.com/btcsuite/btcd/blob/c26ffa870fd817666a857af1bf6498fabba1ffe3/btcec/signature.go#L263
-	if round.temp.m.Cmp(round.Params().EC().Params().N) >= 0 {
+	// In one-round signing mode, m is nil, so skip validation
+	if round.temp.m != nil && round.temp.m.Cmp(round.Params().EC().Params().N) >= 0 {
 		return round.WrapError(errors.New("hashed message is not valid"))
 	}
 
@@ -60,6 +61,11 @@ func (round *round1) Start() *tss.Error {
 	round.temp.gamma = gamma
 	round.temp.pointGamma = pointGamma
 	round.temp.deCommit = cmt.D
+
+	// Store k_i for one-round signing (if msg is nil, we're in one-round mode)
+	if round.temp.m == nil {
+		round.temp.oneRoundKI = k.Bytes()
+	}
 
 	i := round.PartyID().Index
 	round.ok[i] = true
