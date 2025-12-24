@@ -95,6 +95,14 @@ type (
 		Ti *crypto.ECPoint
 		DTelda cmt.HashDeCommitment
 
+		// One-round signing data (populated during rounds, used for exit)
+		oneRoundKI       []byte // k_i from round 1
+		oneRoundRSigmaI  []byte // r * sigma from round 5
+		oneRoundBigR     *crypto.ECPoint
+		oneRoundBigRBarJ map[string]*crypto.ECPoint // Collected from round 5 messages
+		oneRoundBigSJ    map[string]*crypto.ECPoint // Collected from round 6 messages (if available)
+		oneRoundT        int32
+
 		ssidNonce *big.Int
 		ssid      []byte
 	}
@@ -157,7 +165,24 @@ func NewLocalPartyWithKDD(
 	p.temp.pi1jis = make([]*mta.ProofBob, partyCount)
 	p.temp.pi2jis = make([]*mta.ProofBobWC, partyCount)
 	p.temp.vs = make([]*big.Int, partyCount)
+
+	// Initialize one-round data maps
+	p.temp.oneRoundBigRBarJ = make(map[string]*crypto.ECPoint)
+	p.temp.oneRoundBigSJ = make(map[string]*crypto.ECPoint)
+
 	return p
+}
+
+// NewLocalPartyWithOneRoundSign constructs a new ECDSA signing party for one-round signing.
+// The final SignatureData struct will be a partial struct containing only the data for a final signing round.
+// Pass nil for msg to enable one-round mode (pre-processing only).
+func NewLocalPartyWithOneRoundSign(
+	params *tss.Parameters,
+	key keygen.LocalPartySaveData,
+	out chan<- tss.Message,
+	end chan<- *common.SignatureData,
+) tss.Party {
+	return NewLocalParty(nil, params, key, out, end)
 }
 
 func (p *LocalParty) FirstRound() tss.Round {

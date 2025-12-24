@@ -39,6 +39,20 @@ func (round *round8) Update() (bool, *tss.Error) {
 		}
 		round.ok[j] = true
 	}
+
+	// If we're in one-round mode and all messages are received, populate OneRoundData and exit
+	if ret && round.temp.m == nil {
+		// All decommits received, populate OneRoundData and exit
+		round.temp.oneRoundT = int32(len(round.Parties().IDs()) - 1)
+		populateOneRoundData(round.data, round.temp)
+
+		// Exit with OneRoundData
+		round.end <- round.data
+		for j := range round.ok {
+			round.ok[j] = true
+		}
+	}
+
 	return ret, nil
 }
 
@@ -50,6 +64,10 @@ func (round *round8) CanAccept(msg tss.ParsedMessage) bool {
 }
 
 func (round *round8) NextRound() tss.Round {
+	// If we are in one-round signing mode (msg is nil), exit here after decommits
+	if round.temp.m == nil {
+		return nil
+	}
 	round.started = false
 	return &round9{round}
 }
