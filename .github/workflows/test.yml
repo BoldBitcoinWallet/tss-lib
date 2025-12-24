@@ -4,21 +4,31 @@ on:
     branches:
       - master
       - release/*
+      - gg20-one-round-v2
   pull_request:
     branches:
       - master
+      - gg20-one-round-v2
 
 jobs:
   build:
     name: Test
-    runs-on: macOS-latest
+    runs-on: ubuntu-latest
     steps:
 
       - name: Set up Go 1.20
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: 1.20.3
-        id: go
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v2
+        with:
+          version: '3.x'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install protoc-gen-go
+        run: go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 
       - name: Check out code into the Go module directory
         uses: actions/checkout@v3
@@ -29,5 +39,11 @@ jobs:
       - name: Get dependencies
         run: go mod tidy
 
+      - name: Generate Protocol Buffers
+        run: make protob
+        env:
+          PATH: ${{ env.GOPATH }}/bin:${{ env.PATH }}
+
       - name: Run Tests
         run: make test_unit_race
+        timeout-minutes: 90
